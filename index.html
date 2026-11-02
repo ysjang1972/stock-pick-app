@@ -310,6 +310,7 @@ function viewSettings(v){
     <input type="password" id="tok" placeholder="${has ? "저장됨 — 바꾸려면 새로 입력" : "github_pat_로 시작하는 토큰"}" autocomplete="off">
     <div style="height:8px"></div><button class="btn" id="save">저장하고 연결 확인</button>
     ${has ? `<button class="btn ghost" id="del">토큰 지우기</button>` : ""}<div id="msg"></div></div>
+    ${has ? `<div class="card" id="pushCard">${loading("알림 상태 확인 중")}</div>` : ""}
     <details class="card" ${has ? "" : "open"}><summary>토큰 만드는 법</summary><ol class="steps small">
       <li>휴대폰 브라우저로 github.com 로그인 → 오른쪽 위 프로필 → Settings</li>
       <li>맨 아래 Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token</li>
@@ -329,6 +330,65 @@ function viewSettings(v){
     } catch (e) { $("#msg").innerHTML = errorCard(e); }
   };
   const del = $("#del"); if (del) del.onclick = () => { store.set("gh_token", null); render(); };
+  if (has) pushCard($("#pushCard"));
+}
+
+// ---------------------------------------------------------------- 알림 (Web Push)
+const EVENTS = [["picks", "매수용 추천 완료", true], ["holding", "보유 종목 경고 (익절·손절 도달, 시간 청산)", true],
+  ["order", "주문 결과", true], ["fill", "체결·청산 (계좌 동기화)", true], ["failure", "작업 실패", true], ["backtest", "백테스트 완료", false]];
+function savedEvents(){
+  try { const v = JSON.parse(store.get("push_events")); if (Array.isArray(v)) return v; } catch {}
+  return EVENTS.filter(e => e[2]).map(e => e[0]);
+}
+const b64u = s => { const p = "=".repeat((4 - s.length % 4) % 4); const b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(b, c => c.charCodeAt(0)); };
+async function pushSub(){ const reg = await navigator.serviceWorker.ready; return [reg, await reg.pushManager.getSubscription()]; }
+async function pushCard(el){
+  if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+    el.innerHTML = `<div class="name">알림</div><p class="small muted">이 브라우저는 알림을 지원하지 않습니다. 안드로이드 Chrome에서 '앱 설치'로 설치해 여세요.</p>`; return;
+  }
+  let sub = null; try { [, sub] = await pushSub(); } catch {}
+  const perm = Notification.permission, on = !!sub && perm === "granted" && store.get("push_on") === "1";
+  const chosen = new Set(savedEvents());
+  el.innerHTML = `<div class="row"><span class="name">알림</span><span class="chip ${on ? "ok" : ""}">${on ? "켜짐" : "꺼짐"}</span></div>
+    <p class="small muted">고른 일이 생기면 이 휴대폰으로 알려 드립니다.</p>
+    ${EVENTS.map(([k, label]) => `<label class="check" style="padding:6px 0"><input type="checkbox" class="ev" value="${k}" ${chosen.has(k) ? "checked" : ""}><span>${label}</span></label>`).join("")}
+    ${perm === "denied" ? `<div class="banner bad">알림이 차단돼 있습니다. 휴대폰 설정 → 앱 → 종목추천(또는 Chrome) → 알림에서 허용한 뒤 다시 여세요.</div>` : ""}
+    <div style="height:8px"></div>
+    <button class="btn" id="pushSave" ${perm === "denied" ? "disabled" : ""}>${on ? "알림 설정 저장" : "알림 켜기"}</button>
+    ${on ? `<button class="btn ghost" id="pushTest">시험 알림 보내기</button><button class="btn ghost" id="pushOff">알림 끄기</button>` : ""}
+    <div id="pushMsg"></div>`;
+  const msg = h => { $("#pushMsg").innerHTML = h; };
+  const events = () => [...el.querySelectorAll(".ev:checked")].map(c => c.value);
+  $("#pushSave").onclick = async () => {
+    const ev = events(); if (!ev.length) { msg(`<div class="banner warn">알림 받을 일을 하나 이상 고르세요.</div>`); return; }
+    msg(loading("알림 등록 중"));
+    try {
+      if (await Notification.requestPermission() !== "granted") { msg(`<div class="banner bad">알림 권한을 허용해야 합니다.</div>`); return; }
+      const key = ((await raw("notify/vapid_public.txt")) || "").trim();
+      if (!key) {
+        await dispatch("notify.yml", {action: "init"});
+        msg(`<div class="banner warn">알림을 처음 준비하고 있습니다. 1분쯤 뒤 다시 '알림 켜기'를 눌러 주세요.</div>`); return;
+      }
+      const [reg, old] = await pushSub();
+      const s = old || await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64u(key)});
+      const dev = (navigator.userAgentData && navigator.userAgentData.platform) || "휴대폰";
+      await dispatch("notify.yml", {action: "subscribe", subscription: JSON.stringify(s.toJSON()), events: ev.join(","), device: dev});
+      store.set("push_on", "1"); store.set("push_events", JSON.stringify(ev));
+      msg(`<div class="banner">등록을 요청했습니다. 1분쯤 뒤 '알림이 켜졌습니다' 알림이 오면 완료입니다.</div>`);
+      setTimeout(() => current === "settings" && pushCard(el), 2500);
+    } catch (e) { msg(errorCard(e)); }
+  };
+  const t = $("#pushTest"); if (t) t.onclick = async () => {
+    try { const [, s] = await pushSub(); await dispatch("notify.yml", {action: "test", subscription: JSON.stringify(s.toJSON())});
+      msg(`<div class="banner">시험 알림을 요청했습니다. 1분 안에 옵니다.</div>`); } catch (e) { msg(errorCard(e)); }
+  };
+  const off = $("#pushOff"); if (off) off.onclick = async () => {
+    try { const [, s] = await pushSub();
+      if (s) { await dispatch("notify.yml", {action: "unsubscribe", subscription: JSON.stringify(s.toJSON())}); await s.unsubscribe(); }
+      store.set("push_on", null); pushCard(el);
+    } catch (e) { msg(errorCard(e)); }
+  };
 }
 
 // ---------------------------------------------------------------- 탭
@@ -341,7 +401,9 @@ const ICON = {
 };
 const VIEWS = {today: ["오늘 추천", "추천", viewToday], orders: ["주문", "주문", viewOrders], account: ["계좌", "계좌", viewAccount],
                runs: ["실행 기록", "실행", viewRuns], settings: ["설정", "설정", viewSettings]};
-let current = store.get("tab") || "today";
+const urlTab = new URLSearchParams(location.search).get("tab");
+let current = (urlTab && urlTab in VIEWS) ? urlTab : (store.get("tab") || "today");
+if (urlTab) history.replaceState(null, "", location.pathname);
 function go(tab){ current = tab; store.set("tab", tab); render(); window.scrollTo(0, 0); }
 async function render(){
   clearTimeout(window._poll);
