@@ -3,84 +3,167 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1f6feb">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <title>종목추천</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
+/* iOS 시스템 색 (Human Interface Guidelines). 한국 시장 관례: 상승 빨강, 하락 파랑 */
 :root{
-  --bg:#f5f6f8; --card:#ffffff; --text:#14171c; --muted:#5f6670; --line:#e3e6ea;
-  --accent:#1f6feb; --accent-text:#ffffff; --up:#d1242f; --down:#0a62d0; --ok:#1a7f37; --warn:#9a6700;
-  --chip:#eef1f5; --shadow:0 1px 2px rgba(0,0,0,.06);
+  --bg:#F2F2F7; --cell:#FFFFFF; --cell-press:#E5E5EA;
+  --label:#000000; --label2:rgba(60,60,67,.6); --label3:rgba(60,60,67,.3);
+  --sep:rgba(60,60,67,.29); --fill:rgba(120,120,128,.12); --fill2:rgba(120,120,128,.16);
+  --blue:#007AFF; --green:#34C759; --red:#FF3B30; --orange:#FF9500; --gray:#8E8E93;
+  --up:#FF3B30; --down:#007AFF;
+  --bar:rgba(249,249,249,.82); --sheet:#FFFFFF; --dim:rgba(0,0,0,.35);
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#0f1115; --card:#181b21; --text:#e8eaed; --muted:#9aa2ad; --line:#2a2f37;
-    --accent:#4c8dff; --accent-text:#0b0d10; --up:#ff6b6b; --down:#6ea8ff; --ok:#3fb950; --warn:#d29922;
-    --chip:#232831; --shadow:none;
+    --bg:#000000; --cell:#1C1C1E; --cell-press:#2C2C2E;
+    --label:#FFFFFF; --label2:rgba(235,235,245,.6); --label3:rgba(235,235,245,.3);
+    --sep:rgba(84,84,88,.65); --fill:rgba(120,120,128,.24); --fill2:rgba(120,120,128,.32);
+    --blue:#0A84FF; --green:#30D158; --red:#FF453A; --orange:#FF9F0A; --gray:#8E8E93;
+    --up:#FF453A; --down:#0A84FF;
+    --bar:rgba(22,22,24,.82); --sheet:#1C1C1E; --dim:rgba(0,0,0,.55);
   }
 }
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Noto Sans KR","Malgun Gothic",sans-serif;
-  font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
-header{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(12px + env(safe-area-inset-top)) 16px 8px;
-  display:flex;align-items:center;justify-content:space-between;gap:8px}
-header h1{font-size:20px;margin:0;font-weight:700}
-.mode{font-size:12px;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--muted);white-space:nowrap}
-.mode.real{background:var(--up);color:#fff}
-main{padding:0 16px calc(84px + env(safe-area-inset-bottom));max-width:640px;margin:0 auto}
-nav{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom)}
-nav button{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;padding:8px 0 10px;display:flex;
-  flex-direction:column;align-items:center;gap:2px;cursor:pointer}
-nav button svg{width:22px;height:22px}
-nav button[aria-current="page"]{color:var(--accent);font-weight:600}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;box-shadow:var(--shadow)}
-.muted{color:var(--muted)} .small{font-size:13px}
-.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin-top:8px}
-.grid div{display:flex;justify-content:space-between;gap:6px;font-size:14px}
-.grid span:first-child{color:var(--muted)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--label);
+  font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+  font-size:17px;line-height:1.35;letter-spacing:-.01em;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit}
 .num{font-variant-numeric:tabular-nums}
-.name{font-size:17px;font-weight:700}
-.chip{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--chip);color:var(--muted)}
-.chip.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
-.chip.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
-.chip.bad{background:color-mix(in srgb,var(--up) 16%,transparent);color:var(--up)}
+
+/* 내비게이션 막대: 스크롤하면 작은 제목과 흐린 배경 */
+.navbar{position:sticky;top:0;z-index:5;height:calc(44px + env(safe-area-inset-top));padding:env(safe-area-inset-top) 16px 0;
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;background:transparent;transition:background .2s}
+.navbar .small-title{grid-column:2;font-size:17px;font-weight:600;opacity:0;transition:opacity .2s;white-space:nowrap}
+.navbar .mode{grid-column:3;justify-self:end;font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;
+  background:var(--fill);color:var(--label2);white-space:nowrap}
+.navbar .mode.real{background:var(--red);color:#fff}
+.navbar.scrolled{background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  box-shadow:0 .5px 0 var(--sep)}
+.navbar.scrolled .small-title{opacity:1}
+main{max-width:680px;margin:0 auto;padding:0 0 calc(96px + env(safe-area-inset-bottom))}
+.large-title{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:2px 16px 8px;line-height:1.2}
+
+/* 묶음 목록 (inset grouped) */
+.sec-head{font-size:13px;color:var(--label2);margin:22px 32px 7px;text-transform:none}
+.sec-foot{font-size:13px;color:var(--label2);margin:7px 32px 0;line-height:1.4}
+.group{background:var(--cell);border-radius:12px;margin:0 16px;overflow:hidden}
+.group + .group{margin-top:14px}
+.cell{position:relative;display:flex;align-items:center;gap:12px;min-height:44px;padding:11px 16px;background:var(--cell)}
+.cell + .cell::before{content:"";position:absolute;top:0;left:16px;right:0;height:.5px;background:var(--sep)}
+.cell.indent + .cell.indent::before{left:58px}
+.cell .grow{flex:1;min-width:0}
+.cell .sub{font-size:13px;color:var(--label2);margin-top:2px}
+.cell .val{color:var(--label2);text-align:right;white-space:nowrap}
+.cell.tap{cursor:pointer;user-select:none}
+.cell.tap:active{background:var(--cell-press)}
+.cell.action{color:var(--blue);cursor:pointer}
+.cell.action:active{background:var(--cell-press)}
+.cell.action.destructive{color:var(--red)}
+.cell.action[aria-disabled="true"]{color:var(--label3);pointer-events:none}
+.chev{width:8px;height:13px;flex:none;color:var(--label3)}
+.title17{font-size:17px;font-weight:600}
+.trunc{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 추천 카드 */
+.pick-head{padding-top:13px;padding-bottom:13px}
+.checkcircle{width:24px;height:24px;flex:none;border-radius:50%;border:1.5px solid var(--label3);display:grid;place-items:center;transition:all .15s}
+.checkcircle svg{width:14px;height:14px;opacity:0;color:#fff}
+input.pick{position:absolute;opacity:0;pointer-events:none}
+input.pick:checked + .checkcircle{background:var(--blue);border-color:var(--blue)}
+input.pick:checked + .checkcircle svg{opacity:1}
+input.pick:disabled + .checkcircle{opacity:.35}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px;padding:12px 16px 14px}
+.metric .k{font-size:12px;color:var(--label2)}
+.metric .v{font-size:17px;font-weight:600;margin-top:2px}
 .up{color:var(--up)} .down{color:var(--down)}
-.btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font:inherit;font-weight:700;cursor:pointer;
-  background:var(--accent);color:var(--accent-text)}
-.btn:disabled{opacity:.4;cursor:not-allowed}
-.btn.ghost{background:var(--chip);color:var(--text)}
-.btn+.btn{margin-top:8px}
-.banner{border-radius:12px;padding:10px 12px;margin:10px 0;font-size:14px;background:var(--chip)}
-.banner.warn{background:color-mix(in srgb,var(--warn) 18%,transparent)}
-.banner.bad{background:color-mix(in srgb,var(--up) 14%,transparent)}
-pre{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;margin:0}
-details summary{cursor:pointer;color:var(--muted);font-size:14px}
-input[type=password],input[type=text]{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);
-  background:var(--bg);color:var(--text);font:inherit}
-.check{display:flex;gap:12px;align-items:flex-start}
-.check input{width:22px;height:22px;margin-top:3px;accent-color:var(--accent);flex:none}
-.empty{text-align:center;padding:28px 8px;color:var(--muted)}
-.list>div{padding:10px 0;border-top:1px solid var(--line)} .list>div:first-child{border-top:0}
-table{width:100%;border-collapse:collapse;font-size:14px} td,th{padding:8px 4px;border-top:1px solid var(--line);text-align:left}
-th{color:var(--muted);font-weight:500;border-top:0}
-dialog{border:0;border-radius:16px;padding:18px;max-width:420px;width:calc(100% - 32px);background:var(--card);color:var(--text)}
-dialog::backdrop{background:rgba(0,0,0,.45)}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;
-  animation:s 1s linear infinite;vertical-align:-2px} @keyframes s{to{transform:rotate(360deg)}}
-ol.steps{padding-left:20px;margin:6px 0} ol.steps li{margin:4px 0}
+
+/* 알약 표시 */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px;
+  background:var(--fill);color:var(--label2);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.pill.ok{background:color-mix(in srgb,var(--green) 16%,transparent);color:var(--green)}
+.pill.warn{background:color-mix(in srgb,var(--orange) 18%,transparent);color:var(--orange)}
+.pill.bad{background:color-mix(in srgb,var(--red) 14%,transparent);color:var(--red)}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--gray)}
+.dot.ok{background:var(--green)} .dot.warn{background:var(--orange)} .dot.bad{background:var(--red)}
+
+/* 안내 줄 */
+.notice{display:flex;gap:10px;align-items:flex-start;margin:10px 16px 0;padding:12px 14px;border-radius:12px;background:var(--cell);font-size:15px}
+.notice .ic{width:20px;height:20px;flex:none;margin-top:1px}
+.notice.warn .ic{color:var(--orange)} .notice.bad .ic{color:var(--red)} .notice.info .ic{color:var(--blue)} .notice.ok .ic{color:var(--green)}
+
+/* 버튼 */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 32px);margin:16px 16px 0;height:50px;border:0;border-radius:14px;
+  background:var(--blue);color:#fff;font-size:17px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s}
+.btn:active{transform:scale(.98);opacity:.85}
+.btn:disabled{background:var(--fill2);color:var(--label3);cursor:not-allowed;transform:none}
+.btn.tinted{background:color-mix(in srgb,var(--blue) 15%,transparent);color:var(--blue)}
+
+/* 입력 */
+.field{width:100%;border:0;outline:0;background:transparent;color:var(--label);font:inherit;padding:0;min-width:0}
+.field::placeholder{color:var(--label3)}
+
+/* 토글 스위치 */
+.switch{position:relative;width:51px;height:31px;flex:none}
+.switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
+.switch span{position:absolute;inset:0;border-radius:999px;background:var(--fill2);transition:background .2s}
+.switch span::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;
+  box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16);transition:transform .2s cubic-bezier(.3,.7,.4,1)}
+.switch input:checked + span{background:var(--green)}
+.switch input:checked + span::after{transform:translateX(20px)}
+
+/* 펼치기 */
+details.group summary{list-style:none;display:flex;align-items:center;gap:12px;min-height:44px;padding:11px 16px;cursor:pointer}
+details.group summary::-webkit-details-marker{display:none}
+details.group summary .chev{margin-left:auto;transition:transform .2s}
+details.group[open] summary .chev{transform:rotate(90deg)}
+details.group .body{padding:0 16px 14px}
+pre{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-size:12.5px;line-height:1.5;margin:0;color:var(--label)}
+ol.steps{padding-left:20px;margin:4px 0;font-size:15px} ol.steps li{margin:6px 0}
+
+/* 비어 있음·불러오는 중 */
+.empty{text-align:center;padding:36px 24px;color:var(--label2);font-size:15px}
+.empty .big{font-size:20px;font-weight:600;color:var(--label);margin-bottom:6px}
+.spin{display:inline-block;width:16px;height:16px;border-radius:50%;border:2px solid var(--fill2);border-top-color:var(--label2);
+  animation:s .8s linear infinite;vertical-align:-3px} @keyframes s{to{transform:rotate(360deg)}}
+
+/* 탭 막대 */
+nav{position:fixed;left:0;right:0;bottom:0;z-index:6;display:grid;grid-template-columns:repeat(5,1fr);
+  padding:6px 0 calc(6px + env(safe-area-inset-bottom));background:var(--bar);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);box-shadow:0 -.5px 0 var(--sep)}
+nav button{background:none;border:0;color:var(--gray);font-size:10.5px;font-weight:500;display:flex;flex-direction:column;
+  align-items:center;gap:3px;padding:2px 0;cursor:pointer}
+nav button svg{width:26px;height:26px}
+nav button[aria-current="page"]{color:var(--blue)}
+
+/* 아래에서 올라오는 시트 */
+dialog{border:0;padding:0;margin:auto auto 0;width:100%;max-width:680px;background:transparent;color:var(--label);overflow:visible}
+dialog::backdrop{background:var(--dim);animation:fade .2s}
+dialog[open] .sheet{animation:up .28s cubic-bezier(.2,.8,.2,1)}
+@keyframes up{from{transform:translateY(100%)}} @keyframes fade{from{opacity:0}}
+.sheet{background:var(--sheet);border-radius:14px 14px 0 0;padding:8px 0 calc(16px + env(safe-area-inset-bottom))}
+.grabber{width:36px;height:5px;border-radius:3px;background:var(--label3);margin:0 auto 12px}
+.sheet h2{font-size:20px;font-weight:700;margin:4px 20px 12px}
+.sheet .group{background:var(--bg)}
+.sheet .cell{background:transparent}
+.sheet .sec-foot{margin:8px 20px 0}
+.sheet .btns{display:flex;flex-direction:column;gap:8px;margin:16px 16px 0}
+.sheet .btns .btn{margin:0;width:100%}
+.sheet .btns .btn.plain{background:transparent;color:var(--blue);font-weight:400}
 </style>
 </head>
 <body>
-<header><h1 id="title">오늘 추천</h1><span id="mode" class="mode">…</span></header>
-<main id="view"></main>
+<header class="navbar" id="navbar"><span class="small-title" id="smallTitle"></span><span id="mode" class="mode">…</span></header>
+<main><h1 class="large-title" id="title">오늘 추천</h1><div id="view"></div></main>
 <nav id="nav"></nav>
-<dialog id="dlg"><div id="dlgBody"></div><div style="display:flex;gap:8px;margin-top:14px">
-  <button class="btn ghost" id="dlgNo" style="margin:0">취소</button><button class="btn" id="dlgYes" style="margin:0">확인</button></div></dialog>
+<dialog id="dlg"><div class="sheet"><div class="grabber"></div><div id="dlgBody"></div>
+  <div class="btns"><button class="btn" id="dlgYes">확인</button><button class="btn plain" id="dlgNo">취소</button></div></div></dialog>
 
 <script>
 "use strict";
@@ -93,11 +176,27 @@ const store = {
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const won = v => v == null || v === "" || isNaN(v) ? "-" : Math.round(+v).toLocaleString("ko-KR");
-const pct = v => v == null || v === "" || isNaN(v) ? "-" : (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
 const kstToday = () => new Date().toLocaleDateString("sv-SE", {timeZone: "Asia/Seoul"}).replaceAll("-", "");
-const fmtDate = d => d ? `${d.slice(4,6)}/${d.slice(6,8)}` : "";
+const fmtDate = d => d ? `${+d.slice(4,6)}월 ${+d.slice(6,8)}일` : "";
 const ago = iso => { const m = Math.round((Date.now() - new Date(iso)) / 60000);
   return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.round(m/60)}시간 전` : `${Math.round(m/1440)}일 전`; };
+
+// ---------------------------------------------------------------- 아이콘 (SF Symbols 느낌의 선 아이콘)
+const SVG = (p, vb = "0 0 24 24") => `<svg viewBox="${vb}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const I = {
+  chev: `<svg class="chev" viewBox="0 0 8 13" aria-hidden="true"><path d="M1.5 1.5 6.5 6.5 1.5 11.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  check: `<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 7.3 5.8 10 11 4.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  warn: SVG('<path d="M12 3.5 2.8 19.5h18.4L12 3.5z"/><path d="M12 10v4.2M12 17.2v.1"/>'),
+  info: SVG('<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.1"/>'),
+  ok: SVG('<circle cx="12" cy="12" r="9"/><path d="M8 12.3l2.7 2.7L16 9.5"/>'),
+};
+const TAB = {
+  today: ['<path d="M4 20V10M9.3 20V5M14.6 20v-7M20 20V8"/>', '<rect x="3" y="9" width="3" height="11" rx="1" fill="currentColor"/><rect x="8.3" y="4" width="3" height="16" rx="1" fill="currentColor"/><rect x="13.6" y="12" width="3" height="8" rx="1" fill="currentColor"/><rect x="18.9" y="7" width="3" height="13" rx="1" fill="currentColor"/>'],
+  orders: ['<rect x="5" y="3.5" width="14" height="17" rx="2.5"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4"/>', '<rect x="5" y="3.5" width="14" height="17" rx="2.5" fill="currentColor"/><path d="M8.5 8.5h7M8.5 12h7M8.5 15.5h4" style="stroke:var(--cell)"/>'],
+  account: ['<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2.5"/>', '<rect x="3" y="6" width="18" height="13" rx="2.5" fill="currentColor"/><path d="M3 10.5h18M15.5 15h2.5" style="stroke:var(--cell)"/>'],
+  runs: ['<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', '<circle cx="12" cy="12" r="9" fill="currentColor"/><path d="M12 7.5V12l3 2" style="stroke:var(--cell)"/>'],
+  settings: ['<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>', null],
+};
 
 // ---------------------------------------------------------------- GitHub API
 class ApiError extends Error { constructor(status, msg){ super(msg); this.status = status; } }
@@ -151,22 +250,23 @@ function parseCsv(t){
 function confirmBox(html, yes = "확인"){
   return new Promise(res => {
     const d = $("#dlg"); $("#dlgBody").innerHTML = html; $("#dlgYes").textContent = yes;
-    const done = v => { d.close(); $("#dlgYes").onclick = $("#dlgNo").onclick = null; res(v); };
+    const done = v => { d.close(); $("#dlgYes").onclick = $("#dlgNo").onclick = d.onclick = null; res(v); };
     $("#dlgYes").onclick = () => done(true); $("#dlgNo").onclick = () => done(false);
+    d.onclick = e => { if (e.target === d) done(false); };      // 시트 밖을 누르면 닫기
     d.oncancel = () => done(false); d.showModal();
   });
 }
+const notice = (kind, html) => `<div class="notice ${kind}"><span class="ic">${I[kind === "bad" ? "warn" : kind] || I.info}</span><div>${html}</div></div>`;
 function errorCard(e){
-  return `<div class="banner bad">${esc(e.message || e)}</div>` +
-    (e.status === 401 ? `<button class="btn ghost" onclick="go('settings')">설정으로</button>` : "");
+  return notice("bad", esc(e.message || e)) +
+    (e.status === 401 ? `<div class="group" style="margin-top:10px"><div class="cell action" onclick="go('settings')">설정으로 이동</div></div>` : "");
 }
-const loading = msg => `<div class="empty"><span class="spin"></span> ${esc(msg || "불러오는 중")}</div>`;
-const runChip = r => r.status !== "completed" ? `<span class="chip warn"><span class="spin"></span> 실행 중</span>`
-  : r.conclusion === "success" ? `<span class="chip ok">성공</span>`
-  : r.conclusion === "cancelled" ? `<span class="chip">취소</span>` : `<span class="chip bad">실패</span>`;
-const statusChip = s => /^체결/.test(s) ? `<span class="chip ok">${esc(s)}</span>`
-  : /^(주문됨|승인)/.test(s) ? `<span class="chip warn">${esc(s)}</span>`
-  : /^(실패|건너뜀|미체결)/.test(s) ? `<span class="chip bad">${esc(s)}</span>` : `<span class="chip">${esc(s)}</span>`;
+const loading = msg => `<div class="empty"><span class="spin"></span>&nbsp; ${esc(msg || "불러오는 중")}</div>`;
+const runPill = r => r.status !== "completed" ? `<span class="pill warn"><span class="spin" style="width:11px;height:11px;border-width:1.5px"></span>실행 중</span>`
+  : r.conclusion === "success" ? `<span class="pill ok">성공</span>`
+  : r.conclusion === "cancelled" ? `<span class="pill">취소</span>` : `<span class="pill bad">실패</span>`;
+const statusKind = s => /^체결/.test(s) ? "ok" : /^(주문됨|승인)/.test(s) ? "warn" : /^(실패|건너뜀|미체결)/.test(s) ? "bad" : "";
+const statusPill = s => `<span class="pill ${statusKind(s)}">${esc(s.length > 14 ? s.slice(0, 14) + "…" : s)}</span>`;
 
 let MODE = null;
 async function loadMode(){
@@ -184,41 +284,46 @@ async function viewToday(v){
   v.innerHTML = loading();
   const [picks, file] = await Promise.all([json("results/latest_picks.json"), latest("results", "추천_")]);
   const today = kstToday();
-  if (!picks) { v.innerHTML = `<div class="empty">아직 추천 파일이 없습니다.<br>평일 06:40 이후 다시 확인하세요.</div>`; return; }
+  if (!picks) { v.innerHTML = `<div class="empty"><div class="big">아직 추천이 없습니다</div>평일 06:40 이후 다시 확인하세요.</div>`; return; }
   const isToday = picks.entry === today;
-  let h = `<div class="row"><div><div class="name">${fmtDate(picks.entry)} 매수용</div>
-    <div class="small muted">기준일 ${fmtDate(picks.base)} 시세 · 생성 ${esc(picks.created.slice(5, 16))}</div></div></div>`;
-  if (!isToday) h += `<div class="banner warn">오늘(${fmtDate(today)}) 매수용 추천이 아닙니다. 주문 승인은 오늘 매수용 추천에만 할 수 있습니다.</div>`;
-  if (!picks.picks.length) h += `<div class="card empty">오늘은 조건을 만족하는 종목이 없습니다.</div>`;
+  let h = `<div class="sec-head" style="margin-top:4px">${fmtDate(picks.entry)} 매수용 · 기준 ${fmtDate(picks.base)} 시세 · ${esc(picks.created.slice(11, 16))} 생성</div>`;
+  if (!isToday) h += notice("warn", `오늘(${fmtDate(today)}) 매수용 추천이 아닙니다. 주문 승인은 오늘 매수용 추천에만 할 수 있습니다.`);
+  if (!picks.picks.length) h += `<div class="group" style="margin-top:10px"><div class="empty"><div class="big">추천 종목 없음</div>오늘은 조건을 만족하는 종목이 없습니다.</div></div>`;
   for (const p of picks.picks) {
-    const act = p.us_action === "하향" ? `<span class="chip warn">미국 산업군 하락 → 매수가 하향</span>` : "";
-    h += `<label class="card check"><input type="checkbox" class="pick" value="${esc(p.ticker)}" ${isToday ? "checked" : "disabled"}>
-      <div style="flex:1;min-width:0"><div class="row"><span class="name">${esc(p.name)}</span><span class="small muted">${esc(p.ticker)}</span></div>
-      <div class="small muted">${esc(p.industry || "")} ${act}</div>
-      <div class="grid num">
-        <div><span>매수가</span><b>${won(p.buy)}</b></div><div><span>수량</span><b>${won(p.qty)}주</b></div>
-        <div><span>익절</span><span class="up">${won(p.target)}</span></div><div><span>손절</span><span class="down">${won(p.stop)}</span></div>
-        <div><span>종가</span><span>${won(p.close)}</span></div><div><span>금액</span><span>${won(p.buy * p.qty)}</span></div>
-      </div></div></label>`;
+    const tags = p.industry ? esc(p.industry) : "";
+    const down = p.us_action === "하향" ? `<div style="margin-top:6px"><span class="pill warn">미국 산업군 하락 · 매수가 하향</span></div>` : "";
+    h += `<div class="group" style="margin-top:12px">
+      <label class="cell tap pick-head"><input type="checkbox" class="pick" value="${esc(p.ticker)}" ${isToday ? "checked" : "disabled"}>
+        <span class="checkcircle">${I.check}</span>
+        <div class="grow"><div class="title17 trunc">${esc(p.name)}</div><div class="sub trunc">${esc(p.ticker)}${tags ? " · " + tags : ""}</div>${down}</div>
+        <div class="val num"><div style="color:var(--label);font-weight:600">${won(p.buy * p.qty)}원</div><div class="sub">${won(p.qty)}주</div></div></label>
+      <div class="cell" style="padding:0"><div class="metrics num" style="width:100%">
+        <div class="metric"><div class="k">매수가</div><div class="v">${won(p.buy)}</div></div>
+        <div class="metric"><div class="k">익절</div><div class="v up">${won(p.target)}</div></div>
+        <div class="metric"><div class="k">손절</div><div class="v down">${won(p.stop)}</div></div>
+        <div class="metric"><div class="k">전일 종가</div><div class="v">${won(p.close)}</div></div>
+        <div class="metric"><div class="k">추격 상한</div><div class="v">${won(p.cap)}</div></div>
+        <div class="metric"><div class="k">수량</div><div class="v">${won(p.qty)}주</div></div>
+      </div></div></div>`;
   }
   if (picks.picks.length) h += `<button class="btn" id="approve" ${isToday ? "" : "disabled"}>선택한 종목 주문 승인</button>
-    <p class="small muted">08:30 전에 승인하면 08:31에, 장중이면 바로 지정가 매수 주문이 나갑니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</p>`;
-  if (file) h += `<details class="card"><summary>결과 파일 전체 (${esc(file.name)})</summary><pre id="fulltext" class="small" style="margin-top:8px">${loading()}</pre></details>`;
+    <div class="sec-foot">08:30 전에 승인하면 08:31에, 장중이면 바로 지정가 매수 주문이 나갑니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</div>`;
+  if (file) h += `<div class="sec-head">결과 파일</div><details class="group" id="full"><summary><span class="grow trunc">${esc(file.name)}</span>${I.chev}</summary><div class="body"><pre id="fulltext">${loading()}</pre></div></details>`;
   v.innerHTML = h;
-  if (file) v.querySelector("details").addEventListener("toggle", async e => {
+  const full = $("#full"); if (full) full.addEventListener("toggle", async e => {
     if (e.target.open && !e.target.dataset.loaded) { e.target.dataset.loaded = 1; $("#fulltext").textContent = await raw("results/" + file.name); }
   });
   const btn = $("#approve"); if (!btn) return;
-  const upd = () => { const n = v.querySelectorAll(".pick:checked").length; btn.disabled = !isToday || !n; btn.textContent = n ? `선택한 ${n}종목 주문 승인` : "종목을 고르세요"; };
+  const upd = () => { const n = v.querySelectorAll(".pick:checked").length; btn.disabled = !isToday || !n; btn.textContent = n ? `${n}종목 주문 승인` : "종목을 고르세요"; };
   v.querySelectorAll(".pick").forEach(c => c.addEventListener("change", upd)); upd();
   btn.onclick = async () => {
     const sel = [...v.querySelectorAll(".pick:checked")].map(c => c.value);
     const rows = picks.picks.filter(p => sel.includes(p.ticker));
     const total = rows.reduce((s, p) => s + p.buy * p.qty, 0);
-    const ok = await confirmBox(`<div class="name" style="margin-bottom:6px">${modeName()} 매수 승인</div>
-      ${rows.map(p => `<div class="row small num"><span>${esc(p.name)}</span><span>${won(p.qty)}주 × ${won(p.buy)}원</span></div>`).join("")}
-      <div class="row num" style="margin-top:8px;font-weight:700"><span>합계</span><span>${won(total)}원</span></div>
-      <p class="small muted">지정가 주문이며, 계좌 상황에 따라 수량이 줄거나 건너뛸 수 있습니다.</p>`, "승인");
+    const ok = await confirmBox(`<h2>${modeName()} 매수 승인</h2><div class="group">
+      ${rows.map(p => `<div class="cell num"><span class="grow">${esc(p.name)}</span><span class="val">${won(p.qty)}주 × ${won(p.buy)}원</span></div>`).join("")}
+      <div class="cell num"><span class="grow" style="font-weight:600">합계</span><span style="font-weight:600">${won(total)}원</span></div></div>
+      <div class="sec-foot">지정가 주문이며, 계좌 상황에 따라 수량이 줄거나 건너뛸 수 있습니다.</div>`, "승인");
     if (!ok) return;
     btn.disabled = true; btn.innerHTML = `<span class="spin"></span> 보내는 중`;
     try {
@@ -234,19 +339,20 @@ async function viewOrders(v){
   v.innerHTML = loading();
   const today = kstToday();
   const [state, rs] = await Promise.all([json(`results/orders/주문_${today}.json`), runs("order.yml", 5)]);
-  let h = `<div class="name">${fmtDate(today)} 주문</div>`;
   const active = rs.find(r => r.status !== "completed");
-  if (active) h += `<div class="banner warn"><span class="spin"></span> 주문 처리 중 (${ago(active.created_at)} 요청). 자동으로 새로고침합니다.</div>`;
-  else if (rs[0] && rs[0].conclusion === "failure") h += `<div class="banner bad">최근 주문 실행이 실패했습니다. 실행 탭에서 확인하세요.</div>`;
-  if (!state || !state.orders.length) h += `<div class="card empty">오늘 승인한 주문이 없습니다.</div>`;
+  let h = `<div class="sec-head" style="margin-top:4px">${fmtDate(today)}${state ? " · " + (state.mode === "real" ? "실전투자" : "모의투자") : ""}</div>`;
+  if (active) h += notice("info", `<span class="spin"></span>&nbsp; 주문 처리 중 (${ago(active.created_at)} 요청). 자동으로 새로고침합니다.`);
+  else if (rs[0] && rs[0].conclusion === "failure") h += notice("bad", "최근 주문 실행이 실패했습니다. 실행 탭에서 확인하세요.");
+  if (!state || !state.orders.length) h += `<div class="group" style="margin-top:10px"><div class="empty"><div class="big">주문 없음</div>오늘 승인한 주문이 없습니다.</div></div>`;
   else {
-    h += `<div class="card list">` + state.orders.map(o => `<div>
-      <div class="row"><span class="name">${esc(o.name)}</span>${statusChip(o.status)}</div>
-      <div class="small muted num">${esc(o.ticker)} · ${won(o.ordered_qty ?? o.qty)}주 × ${won(o.buy)}원 · 승인 ${esc(o.approved || "")}${o.ordered ? " · 주문 " + esc(o.ordered) : ""}</div>
-    </div>`).join("") + `</div>
-    <p class="small muted">${state.mode === "real" ? "실전투자" : "모의투자"} · 체결 여부는 15:45 계좌 동기화 때 반영됩니다. 지금 확인하려면 계좌 탭의 '지금 동기화'를 누르세요.</p>`;
+    h += `<div class="group" style="margin-top:10px">` + state.orders.map(o => `<div class="cell">
+      <span class="dot ${statusKind(o.status)}"></span>
+      <div class="grow"><div class="title17 trunc">${esc(o.name)}</div>
+        <div class="sub num trunc">${won(o.ordered_qty ?? o.qty)}주 × ${won(o.buy)}원 · 승인 ${esc((o.approved || "").slice(0, 5))}${o.ordered ? " · 주문 " + esc(o.ordered.slice(0, 5)) : ""}</div></div>
+      ${statusPill(o.status)}</div>`).join("") + `</div>
+    <div class="sec-foot">체결 여부는 15:45 계좌 동기화 때 반영됩니다. 지금 확인하려면 계좌 탭에서 '지금 동기화'를 누르세요.</div>`;
   }
-  h += `<button class="btn ghost" onclick="render()">새로고침</button>`;
+  h += `<div class="group" style="margin-top:24px"><div class="cell action" onclick="render()">새로고침</div></div>`;
   v.innerHTML = h;
   const since = +store.get("watch_order") || 0;
   if (active || Date.now() - since < 90000) {   // 방금 승인했으면 실행이 잡힐 때까지 기다린다
@@ -261,17 +367,17 @@ async function viewAccount(v){
   const hold = parseCsv(csv);
   const active = rs.find(r => r.status !== "completed");
   let h = "";
-  if (active) h += `<div class="banner warn"><span class="spin"></span> 동기화 중 (${ago(active.created_at)} 요청)</div>`;
-  h += `<div class="card"><div class="row"><span class="name">보유 종목</span><span class="chip">${hold.length}종목</span></div>`;
-  h += hold.length ? `<table class="num"><tr><th>종목</th><th>수량</th><th>매수가</th></tr>` +
-      hold.map(x => `<tr><td>${esc(x.name)}<div class="small muted">${esc(x.ticker)} · ${fmtDate(x.buy_date)} 매수</div></td><td>${won(x.qty)}</td><td>${won(x.buy_price)}</td></tr>`).join("") + `</table>`
-    : `<div class="empty">보유 종목 없음</div>`;
+  if (active) h += notice("info", `<span class="spin"></span>&nbsp; 동기화 중 (${ago(active.created_at)} 요청)`);
+  h += `<div class="sec-head" style="margin-top:4px">보유 종목 ${hold.length}개</div><div class="group">`;
+  h += hold.length ? hold.map(x => `<div class="cell">
+      <div class="grow"><div class="title17 trunc">${esc(x.name)}</div><div class="sub">${esc(x.ticker)} · ${fmtDate(x.buy_date)} 매수</div></div>
+      <div class="val num"><div style="color:var(--label);font-weight:600">${won(x.qty)}주</div><div class="sub">${won(x.buy_price)}원</div></div></div>`).join("")
+    : `<div class="empty"><div class="big">보유 종목 없음</div>체결되면 여기에 표시됩니다.</div>`;
   h += `</div>`;
-  if (file) { const t = await raw("results/" + file.name); h += `<div class="card"><div class="small muted" style="margin-bottom:6px">${esc(file.name)}</div><pre>${esc(t)}</pre></div>`; }
-  else h += `<div class="card empty">아직 계좌 리포트가 없습니다.</div>`;
-  if (perf) { const t = await raw("results/" + perf.name); h += `<details class="card"><summary>주간 성과 (${esc(perf.name)})</summary><pre style="margin-top:8px">${esc(t)}</pre></details>`; }
+  if (file) { const t = await raw("results/" + file.name); h += `<div class="sec-head">최근 계좌 리포트</div><details class="group" open><summary><span class="grow trunc">${esc(file.name)}</span>${I.chev}</summary><div class="body"><pre>${esc(t)}</pre></div></details>`; }
+  if (perf) { const t = await raw("results/" + perf.name); h += `<div class="sec-head">주간 성과</div><details class="group"><summary><span class="grow trunc">${esc(perf.name)}</span>${I.chev}</summary><div class="body"><pre>${esc(t)}</pre></div></details>`; }
   h += `<button class="btn" id="sync" ${active ? "disabled" : ""}>지금 동기화</button>
-    <p class="small muted">평일 15:45에 자동으로 동기화합니다. 수동 동기화는 1분 정도 걸립니다.</p>`;
+    <div class="sec-foot">평일 15:45에 자동으로 동기화합니다. 수동 동기화는 1분 정도 걸립니다.</div>`;
   v.innerHTML = h;
   $("#sync").onclick = async e => {
     e.target.disabled = true; e.target.innerHTML = `<span class="spin"></span> 요청 중`;
@@ -281,53 +387,61 @@ async function viewAccount(v){
 }
 
 // ---------------------------------------------------------------- 화면: 실행
-const WF = {"daily.yml": "아침 추천", "order.yml": "주문 승인", "sync.yml": "계좌 동기화", "backtest.yml": "백테스트", "trade.yml": "매수·매도 기록", "krx-check.yml": "접속 시험"};
+const WF = {"daily.yml": "아침 추천", "order.yml": "주문 승인", "sync.yml": "계좌 동기화", "backtest.yml": "백테스트", "trade.yml": "매수·매도 기록",
+            "krx-check.yml": "접속 시험", "notify.yml": "알림 설정", "diagnose.yml": "추천 진단", "experiment.yml": "수익률 실험"};
 async function viewRuns(v){
   v.innerHTML = loading();
   const rs = await runs(null, 15);
-  let h = `<div class="card list">` + (rs.length ? rs.map(r => {
+  let h = `<div class="sec-head" style="margin-top:4px">최근 실행</div><div class="group">` + (rs.length ? rs.map(r => {
     const wf = (r.path || "").split("/").pop();
-    return `<div><div class="row"><span>${esc(WF[wf] || r.name)}</span>${runChip(r)}</div>
-      <div class="small muted">${ago(r.created_at)} · ${r.event === "schedule" ? "자동" : "수동"} · <a href="${esc(r.html_url)}" target="_blank" rel="noopener">자세히</a></div></div>`;
+    return `<a class="cell tap" href="${esc(r.html_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">
+      <div class="grow"><div class="trunc">${esc(WF[wf] || r.name)}</div><div class="sub">${ago(r.created_at)} · ${r.event === "schedule" ? "자동" : "실행 요청"}</div></div>
+      ${runPill(r)}${I.chev}</a>`;
   }).join("") : `<div class="empty">실행 기록 없음</div>`) + `</div>`;
-  h += `<button class="btn ghost" id="rerun">추천 다시 실행</button><button class="btn ghost" id="bt">3년 백테스트 실행</button>
-    <button class="btn ghost" onclick="render()">새로고침</button>`;
+  h += `<div class="sec-head">실행</div><div class="group">
+    <div class="cell action" id="rerun">추천 다시 실행</div>
+    <div class="cell action" id="diag">추천 진단</div>
+    <div class="cell action" id="bt">3년 백테스트 실행</div></div>
+    <div class="group" style="margin-top:24px"><div class="cell action" onclick="render()">새로고침</div></div>`;
   v.innerHTML = h;
-  $("#rerun").onclick = async () => {
-    if (!await confirmBox(`<div class="name">추천 다시 실행</div><p class="small muted">가장 최근 거래일 기준으로 추천을 새로 만듭니다. 2~3분 걸립니다.</p>`, "실행")) return;
-    try { await dispatch("daily.yml"); setTimeout(render, 4000); } catch (e) { v.insertAdjacentHTML("afterbegin", errorCard(e)); }
+  const ask = async (title, body, wf) => {
+    if (!await confirmBox(`<h2>${title}</h2><div class="sec-foot" style="font-size:15px">${body}</div>`, "실행")) return;
+    try { await dispatch(wf); setTimeout(render, 4000); } catch (e) { v.insertAdjacentHTML("afterbegin", errorCard(e)); }
   };
-  $("#bt").onclick = async () => {
-    if (!await confirmBox(`<div class="name">3년 백테스트</div><p class="small muted">10분~1시간 걸립니다. 결과는 results/backtest/ 에 올라옵니다.</p>`, "실행")) return;
-    try { await dispatch("backtest.yml"); setTimeout(render, 4000); } catch (e) { v.insertAdjacentHTML("afterbegin", errorCard(e)); }
-  };
+  $("#rerun").onclick = () => ask("추천 다시 실행", "가장 최근 거래일 기준으로 추천을 새로 만듭니다. 2~3분 걸립니다.", "daily.yml");
+  $("#diag").onclick = () => ask("추천 진단", "선별 단계별 종목 수와 기준 변경안 비교를 만듭니다. 10~20분 걸립니다.", "diagnose.yml");
+  $("#bt").onclick = () => ask("3년 백테스트", "10분~1시간 걸립니다. 결과는 results/backtest 에 올라옵니다.", "backtest.yml");
 }
 
 // ---------------------------------------------------------------- 화면: 설정
 function viewSettings(v){
   const has = !!token();
-  v.innerHTML = `<div class="card"><div class="name">GitHub 토큰</div>
-    <p class="small muted">앱이 ${esc(REPO)} 저장소의 결과를 읽고 주문 승인을 실행하는 데 씁니다. 이 휴대폰에만 저장됩니다.</p>
-    <input type="password" id="tok" placeholder="${has ? "저장됨 — 바꾸려면 새로 입력" : "github_pat_로 시작하는 토큰"}" autocomplete="off">
-    <div style="height:8px"></div><button class="btn" id="save">저장하고 연결 확인</button>
-    ${has ? `<button class="btn ghost" id="del">토큰 지우기</button>` : ""}<div id="msg"></div></div>
-    ${has ? `<div class="card" id="pushCard">${loading("알림 상태 확인 중")}</div>` : ""}
-    <details class="card" ${has ? "" : "open"}><summary>토큰 만드는 법</summary><ol class="steps small">
-      <li>휴대폰 브라우저로 github.com 로그인 → 오른쪽 위 프로필 → Settings</li>
-      <li>맨 아래 Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token</li>
-      <li>이름: 종목추천 앱, 만료: 1년(또는 원하는 기간)</li>
-      <li>Repository access: <b>Only select repositories</b> → <b>stock-pick</b> 하나만</li>
-      <li>Permissions → Repository permissions: <b>Actions: Read and write</b>, <b>Contents: Read-only</b> (Metadata는 자동)</li>
+  v.innerHTML = `<div class="sec-head" style="margin-top:4px">GitHub 연결</div>
+    <div class="group">
+      <div class="cell"><span style="flex:none">토큰</span><input type="password" id="tok" class="field" style="text-align:right" placeholder="${has ? "저장됨" : "github_pat_…"}" autocomplete="off"></div>
+      <div class="cell action" id="save">${has ? "바꾸고 연결 확인" : "저장하고 연결 확인"}</div>
+      ${has ? `<div class="cell action destructive" id="del">토큰 지우기</div>` : ""}
+    </div>
+    <div class="sec-foot">결과를 읽고 주문 승인을 실행하는 데 씁니다. 이 휴대폰에만 저장됩니다.</div>
+    <div id="msg"></div>
+    ${has ? `<div id="pushCard">${loading("알림 상태 확인 중")}</div>` : ""}
+    <div class="sec-head">도움말</div>
+    <details class="group" ${has ? "" : "open"}><summary><span class="grow">토큰 만드는 법</span>${I.chev}</summary><div class="body"><ol class="steps">
+      <li>휴대폰 브라우저로 github.com 로그인 → 프로필 → Settings</li>
+      <li>Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token</li>
+      <li>이름: 종목추천 앱, 만료: 1년</li>
+      <li>Repository access: <b>Only select repositories</b> → <b>stock-pick</b></li>
+      <li>Permissions: <b>Actions: Read and write</b>, <b>Contents: Read-only</b></li>
       <li>Generate token → 복사해서 위 칸에 붙여넣기</li></ol>
-      <p class="small muted">이 토큰으로는 코드를 바꿀 수 없고, 결과 읽기와 정해진 실행 버튼만 누를 수 있습니다. 휴대폰을 잃어버리면 GitHub에서 토큰을 삭제하세요.</p></details>
-    <p class="small muted" style="text-align:center">모드: ${modeName()} · 저장소 ${esc(REPO)}</p>`;
+      <div class="sec-foot" style="margin:8px 0 0">이 토큰으로는 코드를 바꿀 수 없습니다. 휴대폰을 잃어버리면 GitHub에서 토큰을 삭제하세요.</div></div></details>
+    <div class="sec-foot" style="text-align:center;margin-top:24px">${modeName()} · ${esc(REPO)}</div>`;
   $("#save").onclick = async () => {
     const t = $("#tok").value.trim(); if (t) store.set("gh_token", t);
     $("#msg").innerHTML = loading("연결 확인 중");
     try {
       const r = await gh(""); if (r.status === 404) throw new ApiError(404, "저장소를 찾지 못했습니다. 토큰의 Repository access 에 stock-pick 이 있는지 확인하세요.");
       await runs(null, 1);
-      $("#msg").innerHTML = `<div class="banner">연결됐습니다.</div>`; await loadMode(); setTimeout(() => go("today"), 600);
+      $("#msg").innerHTML = notice("ok", "연결됐습니다."); await loadMode(); setTimeout(() => go("today"), 600);
     } catch (e) { $("#msg").innerHTML = errorCard(e); }
   };
   const del = $("#del"); if (del) del.onclick = () => { store.set("gh_token", null); render(); };
@@ -335,8 +449,8 @@ function viewSettings(v){
 }
 
 // ---------------------------------------------------------------- 알림 (Web Push)
-const EVENTS = [["picks", "매수용 추천 완료", true], ["holding", "보유 종목 경고 (익절·손절 도달, 시간 청산)", true],
-  ["order", "주문 결과", true], ["fill", "체결·청산 (계좌 동기화)", true], ["failure", "작업 실패", true], ["weekly", "주간 성과 리포트", true], ["backtest", "백테스트 완료", false]];
+const EVENTS = [["picks", "매수용 추천 완료", true], ["holding", "보유 종목 경고", true],
+  ["order", "주문 결과", true], ["fill", "체결·청산", true], ["failure", "작업 실패", true], ["weekly", "주간 성과 리포트", true], ["backtest", "백테스트 완료", false]];
 function savedEvents(){
   try { const v = JSON.parse(store.get("push_events")); if (Array.isArray(v)) return v; } catch {}
   return EVENTS.filter(e => e[2]).map(e => e[0]);
@@ -346,43 +460,48 @@ const b64u = s => { const p = "=".repeat((4 - s.length % 4) % 4); const b = atob
 async function pushSub(){ const reg = await navigator.serviceWorker.ready; return [reg, await reg.pushManager.getSubscription()]; }
 async function pushCard(el){
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    el.innerHTML = `<div class="name">알림</div><p class="small muted">이 브라우저는 알림을 지원하지 않습니다. 안드로이드 Chrome에서 '앱 설치'로 설치해 여세요.</p>`; return;
+    el.innerHTML = `<div class="sec-head">알림</div><div class="group"><div class="cell"><span class="grow">이 브라우저는 알림을 지원하지 않습니다</span></div></div>
+      <div class="sec-foot">안드로이드 Chrome에서 '앱 설치'로 설치해 여세요.</div>`; return;
   }
   let sub = null; try { [, sub] = await pushSub(); } catch {}
   const perm = Notification.permission, on = !!sub && perm === "granted" && store.get("push_on") === "1";
   const chosen = new Set(savedEvents());
-  el.innerHTML = `<div class="row"><span class="name">알림</span><span class="chip ${on ? "ok" : ""}">${on ? "켜짐" : "꺼짐"}</span></div>
-    <p class="small muted">고른 일이 생기면 이 휴대폰으로 알려 드립니다.</p>
-    ${EVENTS.map(([k, label]) => `<label class="check" style="padding:6px 0"><input type="checkbox" class="ev" value="${k}" ${chosen.has(k) ? "checked" : ""}><span>${label}</span></label>`).join("")}
-    ${perm === "denied" ? `<div class="banner bad">알림이 차단돼 있습니다. 휴대폰 설정 → 앱 → 종목추천(또는 Chrome) → 알림에서 허용한 뒤 다시 여세요.</div>` : ""}
-    <div style="height:8px"></div>
-    <button class="btn" id="pushSave" ${perm === "denied" ? "disabled" : ""}>${on ? "알림 설정 저장" : "알림 켜기"}</button>
-    ${on ? `<button class="btn ghost" id="pushTest">시험 알림 보내기</button><button class="btn ghost" id="pushOff">알림 끄기</button>` : ""}
+  el.innerHTML = `<div class="sec-head">알림</div>
+    <div class="group"><div class="cell"><span class="grow">상태</span><span class="pill ${on ? "ok" : ""}">${on ? "켜짐" : "꺼짐"}</span></div></div>
+    ${perm === "denied" ? notice("bad", "알림이 차단돼 있습니다. 휴대폰 설정 → 앱 → 종목추천(또는 Chrome) → 알림에서 허용한 뒤 다시 여세요.") : ""}
+    <div class="sec-head">받을 알림</div>
+    <div class="group">${EVENTS.map(([k, label]) => `<label class="cell tap"><span class="grow">${label}</span>
+      <span class="switch"><input type="checkbox" class="ev" value="${k}" ${chosen.has(k) ? "checked" : ""}><span></span></span></label>`).join("")}</div>
+    <div class="group" style="margin-top:14px">
+      <div class="cell action" id="pushSave" ${perm === "denied" ? 'aria-disabled="true"' : ""}>${on ? "알림 설정 저장" : "알림 켜기"}</div>
+      ${on ? `<div class="cell action" id="pushTest">시험 알림 보내기</div><div class="cell action destructive" id="pushOff">알림 끄기</div>` : ""}
+    </div>
+    <div class="sec-foot">${on ? "항목을 바꾼 뒤에는 '알림 설정 저장'을 누르세요." : "켜면 고른 일이 생길 때 이 휴대폰으로 알려 드립니다."}</div>
     <div id="pushMsg"></div>`;
   const msg = h => { $("#pushMsg").innerHTML = h; };
   const events = () => [...el.querySelectorAll(".ev:checked")].map(c => c.value);
   $("#pushSave").onclick = async () => {
-    const ev = events(); if (!ev.length) { msg(`<div class="banner warn">알림 받을 일을 하나 이상 고르세요.</div>`); return; }
+    const ev = events(); if (!ev.length) { msg(notice("warn", "알림 받을 일을 하나 이상 고르세요.")); return; }
     msg(loading("알림 등록 중"));
     try {
-      if (await Notification.requestPermission() !== "granted") { msg(`<div class="banner bad">알림 권한을 허용해야 합니다.</div>`); return; }
+      if (await Notification.requestPermission() !== "granted") { msg(notice("bad", "알림 권한을 허용해야 합니다.")); return; }
       const key = ((await raw("notify/vapid_public.txt")) || "").trim();
       if (!key) {
         await dispatch("notify.yml", {action: "init"});
-        msg(`<div class="banner warn">알림을 처음 준비하고 있습니다. 1분쯤 뒤 다시 '알림 켜기'를 눌러 주세요.</div>`); return;
+        msg(notice("warn", "알림을 처음 준비하고 있습니다. 1분쯤 뒤 다시 '알림 켜기'를 눌러 주세요.")); return;
       }
       const [reg, old] = await pushSub();
       const s = old || await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64u(key)});
       const dev = (navigator.userAgentData && navigator.userAgentData.platform) || "휴대폰";
       await dispatch("notify.yml", {action: "subscribe", subscription: JSON.stringify(s.toJSON()), events: ev.join(","), device: dev});
       store.set("push_on", "1"); store.set("push_events", JSON.stringify(ev));
-      msg(`<div class="banner">등록을 요청했습니다. 1분쯤 뒤 '알림이 켜졌습니다' 알림이 오면 완료입니다.</div>`);
+      msg(notice("ok", "등록을 요청했습니다. 1분쯤 뒤 '알림이 켜졌습니다' 알림이 오면 완료입니다."));
       setTimeout(() => current === "settings" && pushCard(el), 2500);
     } catch (e) { msg(errorCard(e)); }
   };
   const t = $("#pushTest"); if (t) t.onclick = async () => {
     try { const [, s] = await pushSub(); await dispatch("notify.yml", {action: "test", subscription: JSON.stringify(s.toJSON())});
-      msg(`<div class="banner">시험 알림을 요청했습니다. 1분 안에 옵니다.</div>`); } catch (e) { msg(errorCard(e)); }
+      msg(notice("ok", "시험 알림을 요청했습니다. 1분 안에 옵니다.")); } catch (e) { msg(errorCard(e)); }
   };
   const off = $("#pushOff"); if (off) off.onclick = async () => {
     try { const [, s] = await pushSub();
@@ -393,13 +512,6 @@ async function pushCard(el){
 }
 
 // ---------------------------------------------------------------- 탭
-const ICON = {
-  today: '<path d="M4 19V9m5 10V5m5 14v-7m5 7V8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
-  orders: '<path d="M5 4h14v16H5zM8 9h8M8 13h8M8 17h5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
-  account: '<path d="M3 7h18v12H3zM3 11h18M16 15h2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
-  runs: '<path d="M12 4a8 8 0 1 0 8 8M12 8v4l3 2M20 4v4h-4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>',
-  settings: '<circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10 2.1 2.1M4.9 19.1 7 17m10-10 2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
-};
 const VIEWS = {today: ["오늘 추천", "추천", viewToday], orders: ["주문", "주문", viewOrders], account: ["계좌", "계좌", viewAccount],
                runs: ["실행 기록", "실행", viewRuns], settings: ["설정", "설정", viewSettings]};
 const urlTab = new URLSearchParams(location.search).get("tab");
@@ -409,12 +521,16 @@ function go(tab){ current = tab; store.set("tab", tab); render(); window.scrollT
 async function render(){
   clearTimeout(window._poll);
   if (!token() && current !== "settings") current = "settings";
-  $("#nav").innerHTML = Object.entries(VIEWS).map(([k, [, label]]) =>
-    `<button ${k === current ? 'aria-current="page"' : ""} onclick="go('${k}')"><svg viewBox="0 0 24 24">${ICON[k]}</svg>${label}</button>`).join("");
-  const [title, , fn] = VIEWS[current]; $("#title").textContent = title;
+  $("#nav").innerHTML = Object.entries(VIEWS).map(([k, [, label]]) => {
+    const [line, fill] = TAB[k], active = k === current;
+    return `<button ${active ? 'aria-current="page"' : ""} onclick="go('${k}')">${SVG(active && fill ? fill : line)}${label}</button>`;
+  }).join("");
+  const [title, , fn] = VIEWS[current]; $("#title").textContent = title; $("#smallTitle").textContent = title;
   const v = $("#view");
   try { await fn(v); } catch (e) { v.innerHTML = errorCard(e); }
 }
+const onScroll = () => $("#navbar").classList.toggle("scrolled", window.scrollY > 36);
+window.addEventListener("scroll", onScroll, {passive: true});
 document.addEventListener("visibilitychange", () => { if (!document.hidden && token()) render(); });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 if (token()) loadMode(); else $("#mode").textContent = "연결 전";
