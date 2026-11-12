@@ -1,5 +1,5 @@
 // 앱 화면 파일만 저장해 두고, GitHub 데이터는 항상 새로 받는다.
-const CACHE = "stock-pick-app-v4";
+const CACHE = "stock-pick-app-v5";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", e => {

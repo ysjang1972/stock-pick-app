@@ -351,7 +351,7 @@ function value2(picks){
       <div class="cell" style="padding:0"><div class="metrics num" style="width:100%;grid-template-columns:repeat(2,minmax(0,1fr))">
         <div class="metric"><div class="k">종가</div><div class="v">${won(p.close)}</div></div>
         <div class="metric"><div class="k">1년 최고가</div><div class="v">${won(p.hi52)}</div></div></div></div>
-      ${(p.quarters || []).map(q => `<div class="cell num"><span class="grow">${qLabel(q.yymm)}</span>
+      ${(p.quarters || []).map(q => `<div class="cell num"><span class="grow">${q.label || qLabel(q.yymm)}</span>
         <span class="val">매출 <span class="up">${pctInt(q.sale_yoy)}</span> · 영업이익 <span class="up">${q.op_yoy == null ? "흑자전환" : pctInt(q.op_yoy)}</span></span></div>`).join("")}
     </div>`;
   }
