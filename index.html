@@ -288,7 +288,8 @@ async function viewToday(v){
   const isToday = picks.entry === today;
   let h = `<div class="sec-head" style="margin-top:4px">${fmtDate(picks.entry)} 매수용 · 기준 ${fmtDate(picks.base)} 시세 · ${esc(picks.created.slice(11, 16))} 생성</div>`;
   if (!isToday) h += notice("warn", `오늘(${fmtDate(today)}) 매수용 추천이 아닙니다. 주문 승인은 오늘 매수용 추천에만 할 수 있습니다.`);
-  if (!picks.picks.length) h += `<div class="group" style="margin-top:10px"><div class="empty"><div class="big">추천 종목 없음</div>오늘은 조건을 만족하는 종목이 없습니다.</div></div>`;
+  h += `<div class="sec-head">방식1 · 52주 신고가 모멘텀 (주문 승인 대상)</div>`;
+  if (!picks.picks.length) h += `<div class="group"><div class="empty"><div class="big">추천 종목 없음</div>오늘은 조건을 만족하는 종목이 없습니다.</div></div>`;
   for (const p of picks.picks) {
     const tags = p.industry ? esc(p.industry) : "";
     const down = p.us_action === "하향" ? `<div style="margin-top:6px"><span class="pill warn">미국 산업군 하락 · 매수가 하향</span></div>` : "";
@@ -308,6 +309,7 @@ async function viewToday(v){
   }
   if (picks.picks.length) h += `<button class="btn" id="approve" ${isToday ? "" : "disabled"}>선택한 종목 주문 승인</button>
     <div class="sec-foot">08:30 전에 승인하면 08:31에, 장중이면 바로 지정가 매수 주문이 나갑니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</div>`;
+  h += value2(picks);
   if (file) h += `<div class="sec-head">결과 파일</div><details class="group" id="full"><summary><span class="grow trunc">${esc(file.name)}</span>${I.chev}</summary><div class="body"><pre id="fulltext">${loading()}</pre></div></details>`;
   v.innerHTML = h;
   const full = $("#full"); if (full) full.addEventListener("toggle", async e => {
@@ -332,6 +334,28 @@ async function viewToday(v){
       go("orders");
     } catch (e) { btn.disabled = false; upd(); v.insertAdjacentHTML("afterbegin", errorCard(e)); }
   };
+}
+
+// 방식2 (참고용): 낙폭 큰 실적 성장주
+const qLabel = ym => `${ym.slice(2, 4)}.${Math.floor((+ym.slice(4) + 2) / 3)}Q`;
+const pctInt = v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%";
+function value2(picks){
+  if (!("picks2" in picks)) return "";
+  let h = `<div class="sec-head">방식2 · 낙폭 큰 실적 성장주 (참고용)</div>`;
+  const list = picks.picks2 || [];
+  if (!list.length) return h + `<div class="group"><div class="empty"><div class="big">해당 종목 없음</div>${esc(picks.note2 || "조건을 만족하는 종목이 없습니다.")}</div></div>`;
+  for (const p of list) {
+    h += `<div class="group" style="margin-top:12px"><div class="cell">
+        <div class="grow"><div class="title17 trunc">${esc(p.name)}</div><div class="sub trunc">${esc(p.ticker)} · ${esc(p.market || "")}</div></div>
+        <div class="val num"><div class="down" style="font-weight:600">${(p.drawdown * 100).toFixed(1)}%</div><div class="sub">1년 최고가 대비</div></div></div>
+      <div class="cell" style="padding:0"><div class="metrics num" style="width:100%;grid-template-columns:repeat(2,minmax(0,1fr))">
+        <div class="metric"><div class="k">종가</div><div class="v">${won(p.close)}</div></div>
+        <div class="metric"><div class="k">1년 최고가</div><div class="v">${won(p.hi52)}</div></div></div></div>
+      ${(p.quarters || []).map(q => `<div class="cell num"><span class="grow">${qLabel(q.yymm)}</span>
+        <span class="val">매출 <span class="up">${pctInt(q.sale_yoy)}</span> · 영업이익 <span class="up">${q.op_yoy == null ? "흑자전환" : pctInt(q.op_yoy)}</span></span></div>`).join("")}
+    </div>`;
+  }
+  return h + `<div class="sec-foot">최근 4개 분기 연속으로 매출·영업이익이 전년 같은 분기보다 늘어난 종목을 낙폭 큰 순으로 보여 줍니다. 백테스트로 검증하지 않은 참고 목록이며 주문 승인 대상이 아닙니다.${picks.note2 ? " " + esc(picks.note2) + "." : ""}</div>`;
 }
 
 // ---------------------------------------------------------------- 화면: 주문
