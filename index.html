@@ -288,28 +288,18 @@ async function viewToday(v){
   const isToday = picks.entry === today;
   let h = `<div class="sec-head" style="margin-top:4px">${fmtDate(picks.entry)} 매수용 · 기준 ${fmtDate(picks.base)} 시세 · ${esc(picks.created.slice(11, 16))} 생성</div>`;
   if (!isToday) h += notice("warn", `오늘(${fmtDate(today)}) 매수용 추천이 아닙니다. 주문 승인은 오늘 매수용 추천에만 할 수 있습니다.`);
-  h += `<div class="sec-head">방식1 · 52주 신고가 모멘텀 (주문 승인 대상)</div>`;
-  if (!picks.picks.length) h += `<div class="group"><div class="empty"><div class="big">추천 종목 없음</div>오늘은 조건을 만족하는 종목이 없습니다.</div></div>`;
-  for (const p of picks.picks) {
-    const tags = p.industry ? esc(p.industry) : "";
-    const down = p.us_action === "하향" ? `<div style="margin-top:6px"><span class="pill warn">미국 산업군 하락 · 매수가 하향</span></div>` : "";
-    h += `<div class="group" style="margin-top:12px">
-      <label class="cell tap pick-head"><input type="checkbox" class="pick" value="${esc(p.ticker)}" ${isToday ? "checked" : "disabled"}>
-        <span class="checkcircle">${I.check}</span>
-        <div class="grow"><div class="title17 trunc">${esc(p.name)}</div><div class="sub trunc">${esc(p.ticker)}${tags ? " · " + tags : ""}</div>${down}</div>
-        <div class="val num"><div style="color:var(--label);font-weight:600">${won(p.buy * p.qty)}원</div><div class="sub">${won(p.qty)}주</div></div></label>
-      <div class="cell" style="padding:0"><div class="metrics num" style="width:100%">
-        <div class="metric"><div class="k">매수가</div><div class="v">${won(p.buy)}</div></div>
-        <div class="metric"><div class="k">익절</div><div class="v up">${won(p.target)}</div></div>
-        <div class="metric"><div class="k">손절</div><div class="v down">${won(p.stop)}</div></div>
-        <div class="metric"><div class="k">전일 종가</div><div class="v">${won(p.close)}</div></div>
-        <div class="metric"><div class="k">추격 상한</div><div class="v">${won(p.cap)}</div></div>
-        <div class="metric"><div class="k">수량</div><div class="v">${won(p.qty)}주</div></div>
-      </div></div></div>`;
-  }
-  if (picks.picks.length) h += `<button class="btn" id="approve" ${isToday ? "" : "disabled"}>선택한 종목 주문 승인</button>
-    <div class="sec-foot">08:30 전에 승인하면 08:31에, 장중이면 바로 지정가 매수 주문이 나갑니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</div>`;
-  h += value2(picks);
+  const m1 = (picks.picks || []).map(p => ({...p, method: 1}));
+  const m2 = (picks.picks2 || []).map(p => ({...p, method: 2}));
+  const orderable = [...m1, ...m2.filter(p => p.buy && p.qty)];
+  h += `<div class="sec-head">방식1 · 52주 신고가 모멘텀</div>`;
+  if (!m1.length) h += `<div class="group"><div class="empty"><div class="big">추천 종목 없음</div>오늘은 조건을 만족하는 종목이 없습니다.</div></div>`;
+  for (const p of m1) h += pickCard(p, isToday);
+  h += `<div class="sec-head">방식2 · 낙폭 큰 실적 성장주</div>`;
+  if (!m2.length) h += `<div class="group"><div class="empty"><div class="big">추천 종목 없음</div>${esc(picks.note2 || "조건을 만족하는 종목이 없습니다.")}</div></div>`;
+  for (const p of m2) h += pickCard(p, isToday);
+  if (m2.length) h += `<div class="sec-foot">최근 4개 분기 연속으로 매출·영업이익이 전년 같은 분기보다 늘어난 종목을 1년 최고가 대비 낙폭 큰 순으로 고릅니다. 백테스트로 검증하지 않았고, 방식1과 같은 지정가·익절·손절 규칙을 씁니다.${picks.note2 ? " " + esc(picks.note2) + "." : ""}</div>`;
+  if (orderable.length) h += `<button class="btn" id="approve" ${isToday ? "" : "disabled"}>선택한 종목 주문 승인</button>
+    <div class="sec-foot">08:30 전에 승인하면 08:31에, 장중이면 바로 지정가 매수 주문이 나갑니다. 방식1·방식2는 투자금을 반씩 나눠 방식별로 최대 5종목입니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</div>`;
   if (file) h += `<div class="sec-head">결과 파일</div><details class="group" id="full"><summary><span class="grow trunc">${esc(file.name)}</span>${I.chev}</summary><div class="body"><pre id="fulltext">${loading()}</pre></div></details>`;
   v.innerHTML = h;
   const full = $("#full"); if (full) full.addEventListener("toggle", async e => {
@@ -320,10 +310,10 @@ async function viewToday(v){
   v.querySelectorAll(".pick").forEach(c => c.addEventListener("change", upd)); upd();
   btn.onclick = async () => {
     const sel = [...v.querySelectorAll(".pick:checked")].map(c => c.value);
-    const rows = picks.picks.filter(p => sel.includes(p.ticker));
+    const rows = orderable.filter(p => sel.includes(p.ticker));
     const total = rows.reduce((s, p) => s + p.buy * p.qty, 0);
     const ok = await confirmBox(`<h2>${modeName()} 매수 승인</h2><div class="group">
-      ${rows.map(p => `<div class="cell num"><span class="grow">${esc(p.name)}</span><span class="val">${won(p.qty)}주 × ${won(p.buy)}원</span></div>`).join("")}
+      ${rows.map(p => `<div class="cell num"><span class="grow">${esc(p.name)} <span class="pill">방식${p.method}</span></span><span class="val">${won(p.qty)}주 × ${won(p.buy)}원</span></div>`).join("")}
       <div class="cell num"><span class="grow" style="font-weight:600">합계</span><span style="font-weight:600">${won(total)}원</span></div></div>
       <div class="sec-foot">지정가 주문이며, 계좌 상황에 따라 수량이 줄거나 건너뛸 수 있습니다.</div>`, "승인");
     if (!ok) return;
@@ -336,26 +326,30 @@ async function viewToday(v){
   };
 }
 
-// 방식2 (참고용): 낙폭 큰 실적 성장주
+// 추천 카드 (방식1·방식2 공통). 방식2 는 낙폭과 분기별 실적 증가율이 붙는다
 const qLabel = ym => `${ym.slice(2, 4)}.${Math.floor((+ym.slice(4) + 2) / 3)}Q`;
 const pctInt = v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%";
-function value2(picks){
-  if (!("picks2" in picks)) return "";
-  let h = `<div class="sec-head">방식2 · 낙폭 큰 실적 성장주 (참고용)</div>`;
-  const list = picks.picks2 || [];
-  if (!list.length) return h + `<div class="group"><div class="empty"><div class="big">해당 종목 없음</div>${esc(picks.note2 || "조건을 만족하는 종목이 없습니다.")}</div></div>`;
-  for (const p of list) {
-    h += `<div class="group" style="margin-top:12px"><div class="cell">
-        <div class="grow"><div class="title17 trunc">${esc(p.name)}</div><div class="sub trunc">${esc(p.ticker)} · ${esc(p.market || "")}</div></div>
-        <div class="val num"><div class="down" style="font-weight:600">${(p.drawdown * 100).toFixed(1)}%</div><div class="sub">1년 최고가 대비</div></div></div>
-      <div class="cell" style="padding:0"><div class="metrics num" style="width:100%;grid-template-columns:repeat(2,minmax(0,1fr))">
-        <div class="metric"><div class="k">종가</div><div class="v">${won(p.close)}</div></div>
-        <div class="metric"><div class="k">1년 최고가</div><div class="v">${won(p.hi52)}</div></div></div></div>
-      ${(p.quarters || []).map(q => `<div class="cell num"><span class="grow">${q.label || qLabel(q.yymm)}</span>
-        <span class="val">매출 <span class="up">${pctInt(q.sale_yoy)}</span> · 영업이익 <span class="up">${q.op_yoy == null ? "흑자전환" : pctInt(q.op_yoy)}</span></span></div>`).join("")}
-    </div>`;
-  }
-  return h + `<div class="sec-foot">최근 4개 분기 연속으로 매출·영업이익이 전년 같은 분기보다 늘어난 종목을 낙폭 큰 순으로 보여 줍니다. 백테스트로 검증하지 않은 참고 목록이며 주문 승인 대상이 아닙니다.${picks.note2 ? " " + esc(picks.note2) + "." : ""}</div>`;
+function pickCard(p, isToday){
+  const can = !!(p.buy && p.qty);
+  const tags = [p.industry ? esc(p.industry) : "", p.method === 2 && p.market ? esc(p.market) : ""].filter(Boolean).join(" · ");
+  const down = p.us_action === "하향" ? `<div style="margin-top:6px"><span class="pill warn">미국 산업군 하락 · 매수가 하향</span></div>` : "";
+  const dd = p.method === 2 && p.drawdown != null ? `<div class="sub num"><span class="down" style="font-weight:600">1년 최고가 대비 ${(p.drawdown * 100).toFixed(1)}%</span> · 최고가 ${won(p.hi52)}</div>` : "";
+  const money = can ? `<div class="val num"><div style="color:var(--label);font-weight:600">${won(p.buy * p.qty)}원</div><div class="sub">${won(p.qty)}주</div></div>` : "";
+  const metrics = can ? `<div class="cell" style="padding:0"><div class="metrics num" style="width:100%">
+        <div class="metric"><div class="k">매수가</div><div class="v">${won(p.buy)}</div></div>
+        <div class="metric"><div class="k">익절</div><div class="v up">${won(p.target)}</div></div>
+        <div class="metric"><div class="k">손절</div><div class="v down">${won(p.stop)}</div></div>
+        <div class="metric"><div class="k">전일 종가</div><div class="v">${won(p.close)}</div></div>
+        <div class="metric"><div class="k">추격 상한</div><div class="v">${won(p.cap)}</div></div>
+        <div class="metric"><div class="k">수량</div><div class="v">${won(p.qty)}주</div></div>
+      </div></div>` : "";
+  const quarters = (p.quarters || []).map(q => `<div class="cell num"><span class="grow">${q.label || qLabel(q.yymm)}</span>
+        <span class="val">매출 <span class="up">${pctInt(q.sale_yoy)}</span> · 영업이익 <span class="up">${q.op_yoy == null ? "흑자전환" : pctInt(q.op_yoy)}</span></span></div>`).join("");
+  return `<div class="group" style="margin-top:12px">
+      <label class="cell tap pick-head"><input type="checkbox" class="pick" value="${esc(p.ticker)}" ${isToday && can ? "checked" : "disabled"}>
+        <span class="checkcircle">${I.check}</span>
+        <div class="grow"><div class="title17 trunc">${esc(p.name)}</div><div class="sub trunc">${esc(p.ticker)}${tags ? " · " + tags : ""}</div>${dd}${down}</div>
+        ${money}</label>${metrics}${quarters}</div>`;
 }
 
 // ---------------------------------------------------------------- 화면: 주문
@@ -371,7 +365,7 @@ async function viewOrders(v){
   else {
     h += `<div class="group" style="margin-top:10px">` + state.orders.map(o => `<div class="cell">
       <span class="dot ${statusKind(o.status)}"></span>
-      <div class="grow"><div class="title17 trunc">${esc(o.name)}</div>
+      <div class="grow"><div class="title17 trunc">${esc(o.name)} <span class="pill" style="vertical-align:2px">방식${o.method || 1}</span></div>
         <div class="sub num trunc">${won(o.ordered_qty ?? o.qty)}주 × ${won(o.buy)}원 · 승인 ${esc((o.approved || "").slice(0, 5))}${o.ordered ? " · 주문 " + esc(o.ordered.slice(0, 5)) : ""}</div></div>
       ${statusPill(o.status)}</div>`).join("") + `</div>
     <div class="sec-foot">체결 여부는 15:45 계좌 동기화 때 반영됩니다. 지금 확인하려면 계좌 탭에서 '지금 동기화'를 누르세요.</div>`;
