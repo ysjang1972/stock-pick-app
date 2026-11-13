@@ -82,6 +82,7 @@ input.pick:disabled + .checkcircle{opacity:.35}
 .metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px;padding:12px 16px 14px}
 .metric .k{font-size:12px;color:var(--label2)}
 .metric .v{font-size:17px;font-weight:600;margin-top:2px}
+.quote .metric .v{font-size:15px;letter-spacing:-.02em}
 .up{color:var(--up)} .down{color:var(--down)}
 
 /* 알약 표시 */
@@ -268,12 +269,21 @@ const runPill = r => r.status !== "completed" ? `<span class="pill warn"><span c
 const statusKind = s => /^체결/.test(s) ? "ok" : /^(주문됨|승인)/.test(s) ? "warn" : /^(실패|건너뜀|미체결)/.test(s) ? "bad" : "";
 const statusPill = s => `<span class="pill ${statusKind(s)}">${esc(s.length > 14 ? s.slice(0, 14) + "…" : s)}</span>`;
 
-let MODE = null;
+let MODE = null, CFG = {per: {1: 0, 2: 0}, start: "09:00", end: "15:20"};
+const kstNow = () => { const d = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+  return {hm: String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"), dow: d.getDay()}; };
+const marketState = () => { const {hm, dow} = kstNow();
+  return dow === 0 || dow === 6 ? "closed" : hm < CFG.start ? "before" : hm >= CFG.end ? "after" : "open"; };
 async function loadMode(){
   try {
     const cfg = await raw("config.yaml") || "";
     const m = cfg.match(/^\s*mode:\s*(\w+)/m);
     MODE = m ? m[1] : "paper";
+    const num = (re, d) => { const x = cfg.match(re); return x ? +x[1] : d; };
+    const cap = num(/^capital:\s*(\d+)/m, 0), mp = num(/^max_positions:\s*(\d+)/m, 5);
+    CFG = {per: {1: cap * num(/^\s+m1:\s*([\d.]+)/m, 1) / mp, 2: cap * num(/^\s+m2:\s*([\d.]+)/m, 0) / mp},
+           start: (cfg.match(/order_start:\s*"(\d\d:\d\d)"/) || [])[1] || "09:00",
+           end: (cfg.match(/order_end:\s*"(\d\d:\d\d)"/) || [])[1] || "15:20"};
     const el = $("#mode"); el.textContent = MODE === "real" ? "실전투자" : "모의투자"; el.className = "mode" + (MODE === "real" ? " real" : "");
   } catch { $("#mode").textContent = "연결 안 됨"; }
 }
@@ -298,33 +308,83 @@ async function viewToday(v){
   if (!m2.length) h += `<div class="group"><div class="empty"><div class="big">추천 종목 없음</div>${esc(picks.note2 || "조건을 만족하는 종목이 없습니다.")}</div></div>`;
   for (const p of m2) h += pickCard(p, isToday);
   if (m2.length) h += `<div class="sec-foot">최근 4개 분기 연속으로 매출·영업이익이 전년 같은 분기보다 늘어난 종목을 1년 최고가 대비 낙폭 큰 순으로 고릅니다. 백테스트로 검증하지 않았고, 방식1과 같은 지정가·익절·손절 규칙을 씁니다.${picks.note2 ? " " + esc(picks.note2) + "." : ""}</div>`;
-  if (orderable.length) h += `<button class="btn" id="approve" ${isToday ? "" : "disabled"}>선택한 종목 주문 승인</button>
-    <div class="sec-foot">08:30 전에 승인하면 08:31에, 장중이면 바로 지정가 매수 주문이 나갑니다. 방식1·방식2는 투자금을 반씩 나눠 방식별로 최대 5종목입니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</div>`;
+  await loadMode();
+  const mk = marketState();
+  const mkMsg = {before: `장 시작 전입니다. 주문은 ${CFG.start}~${CFG.end}에만 할 수 있습니다. ${CFG.start} 이후에 현재가를 확인하고 승인하세요.`,
+                 after: `오늘 주문 가능 시간(${CFG.start}~${CFG.end})이 지났습니다.`, closed: "오늘은 장이 열리지 않습니다."}[mk];
+  const canOrder = isToday && mk === "open";
+  if (orderable.length) {
+    if (isToday && mkMsg) h += notice("info", mkMsg);
+    h += `<button class="btn ${canOrder ? "" : "tinted"}" id="approve">${canOrder ? "현재가 확인 후 주문" : "현재가만 확인"}</button>
+    <div class="sec-foot">주문은 장중에만 되고, 승인하는 시점의 현재가로 지정가 매수 주문이 나갑니다. 수량은 종목당 ${won(CFG.per[1])}원을 현재가로 나눈 값입니다. 익절·손절은 체결 뒤 한국투자 앱 자동감시주문으로 등록하세요.</div>`;
+  }
   if (file) h += `<div class="sec-head">결과 파일</div><details class="group" id="full"><summary><span class="grow trunc">${esc(file.name)}</span>${I.chev}</summary><div class="body"><pre id="fulltext">${loading()}</pre></div></details>`;
   v.innerHTML = h;
   const full = $("#full"); if (full) full.addEventListener("toggle", async e => {
     if (e.target.open && !e.target.dataset.loaded) { e.target.dataset.loaded = 1; $("#fulltext").textContent = await raw("results/" + file.name); }
   });
   const btn = $("#approve"); if (!btn) return;
-  const upd = () => { const n = v.querySelectorAll(".pick:checked").length; btn.disabled = !isToday || !n; btn.textContent = n ? `${n}종목 주문 승인` : "종목을 고르세요"; };
-  v.querySelectorAll(".pick").forEach(c => c.addEventListener("change", upd)); upd();
+  const label = () => canOrder ? "현재가 확인 후 주문" : "현재가만 확인";
+  const selected = () => [...v.querySelectorAll(".pick:checked")].map(c => c.value);
+  const upd = () => { btn.disabled = canOrder && !selected().length; };
+  v.querySelectorAll(".pick").forEach(c => { if (!canOrder) c.disabled = true; c.addEventListener("change", upd); }); upd();
+  const showQuotes = q => {
+    for (const el of v.querySelectorAll(".quote")) {
+      const x = q.quotes[el.dataset.t]; if (!x || x.error) { el.innerHTML = x ? `<div class="cell sub">현재가를 받지 못했습니다</div>` : ""; continue; }
+      const cls = x.chg > 0 ? "up" : x.chg < 0 ? "down" : "";
+      el.innerHTML = `<div class="cell" style="padding:0"><div class="metrics num" style="width:100%;grid-template-columns:repeat(4,minmax(0,1fr));padding-bottom:10px;gap:12px 4px;font-size:15px">
+        <div class="metric"><div class="k">현재가</div><div class="v ${cls}">${won(x.price)}</div><div class="k ${cls}">${pctInt1(x.chg)}</div></div>
+        <div class="metric"><div class="k">시가</div><div class="v" style="font-weight:500">${won(x.open)}</div></div>
+        <div class="metric"><div class="k">고가</div><div class="v up" style="font-weight:500">${won(x.high)}</div></div>
+        <div class="metric"><div class="k">저가</div><div class="v down" style="font-weight:500">${won(x.low)}</div></div>
+      </div></div>`;
+    }
+  };
+  const fetchQuotes = async () => {
+    const req = "r" + Date.now();
+    await dispatch("quote.yml", {req});
+    for (let i = 0; i < 30; i++) {                      // 최대 2분 30초
+      await new Promise(r => setTimeout(r, 5000));
+      if (current !== "today") return null;
+      const q = await json("results/quotes.json").catch(() => null);
+      if (q && q.req === req) return q;
+    }
+    throw new Error("현재가 조회가 오래 걸립니다. 잠시 뒤 다시 시도하세요.");
+  };
   btn.onclick = async () => {
-    const sel = [...v.querySelectorAll(".pick:checked")].map(c => c.value);
-    const rows = orderable.filter(p => sel.includes(p.ticker));
-    const total = rows.reduce((s, p) => s + p.buy * p.qty, 0);
-    const ok = await confirmBox(`<h2>${modeName()} 매수 승인</h2><div class="group">
-      ${rows.map(p => `<div class="cell num"><span class="grow">${esc(p.name)} <span class="pill">방식${p.method}</span></span><span class="val">${won(p.qty)}주 × ${won(p.buy)}원</span></div>`).join("")}
-      <div class="cell num"><span class="grow" style="font-weight:600">합계</span><span style="font-weight:600">${won(total)}원</span></div></div>
-      <div class="sec-foot">지정가 주문이며, 계좌 상황에 따라 수량이 줄거나 건너뛸 수 있습니다.</div>`, "승인");
-    if (!ok) return;
+    const sel = selected();
+    btn.disabled = true; btn.innerHTML = `<span class="spin"></span> 현재가 확인 중 (1분쯤 걸립니다)`;
+    let q;
+    try { q = await fetchQuotes(); } catch (e) { btn.disabled = false; btn.textContent = label(); v.insertAdjacentHTML("afterbegin", errorCard(e)); return; }
+    btn.disabled = false; btn.textContent = label(); upd();
+    if (!q) return;
+    showQuotes(q);
+    if (!canOrder || marketState() !== "open") return;
+    const rows = orderable.filter(p => sel.includes(p.ticker)).map(p => {
+      const x = q.quotes[p.ticker] || {}; const price = x.price || 0;
+      return {...p, x, price, n: price ? Math.floor(CFG.per[p.method] / price) : 0};
+    });
+    const ok = rows.filter(r => r.n >= 1);
+    const total = ok.reduce((s, r) => s + r.price * r.n, 0);
+    const yes = await confirmBox(`<h2>${modeName()} 매수 승인</h2><div class="group">
+      ${rows.map(r => `<div class="cell num"><div class="grow"><div>${esc(r.name)} <span class="pill">방식${r.method}</span></div>
+          <div class="sub">${r.price ? `현재 ${won(r.price)} (${pctInt1(r.x.chg)}) · 고 ${won(r.x.high)} · 저 ${won(r.x.low)}` : "현재가 없음"}</div></div>
+        <span class="val">${r.n >= 1 ? `${won(r.n)}주<div class="sub">${won(r.price * r.n)}원</div>` : `<span class="pill bad">1주 미만</span>`}</span></div>`).join("")}
+      <div class="cell num"><span class="grow" style="font-weight:600">합계 (예상)</span><span style="font-weight:600">${won(total)}원</span></div></div>
+      <div class="sec-foot">${esc(q.time.slice(11, 16))} 기준 시세입니다. 실제 주문가는 승인 직후의 현재가라 조금 다를 수 있고, 1주 미만·상한가·빈 슬롯 없음이면 건너뜁니다.</div>`, "승인");
+    if (!yes) return;
     btn.disabled = true; btn.innerHTML = `<span class="spin"></span> 보내는 중`;
     try {
       await dispatch("order.yml", {tickers: sel.join(",")});
       store.set("watch_order", String(Date.now()));
       go("orders");
-    } catch (e) { btn.disabled = false; upd(); v.insertAdjacentHTML("afterbegin", errorCard(e)); }
+    } catch (e) { btn.disabled = false; btn.textContent = label(); v.insertAdjacentHTML("afterbegin", errorCard(e)); }
   };
+  // 최근(10분 이내)에 조회한 시세가 있으면 바로 보여 준다
+  json("results/quotes.json").then(q => { if (q && q.entry === picks.entry && Date.now() - new Date(q.time.replace(" ", "T") + "+09:00") < 600000) showQuotes(q); }).catch(() => {});
 }
+
+const pctInt1 = v => (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
 
 // 추천 카드 (방식1·방식2 공통). 방식2 는 낙폭과 분기별 실적 증가율이 붙는다
 const qLabel = ym => `${ym.slice(2, 4)}.${Math.floor((+ym.slice(4) + 2) / 3)}Q`;
@@ -336,7 +396,7 @@ function pickCard(p, isToday){
   const dd = p.method === 2 && p.drawdown != null ? `<div class="sub num"><span class="down" style="font-weight:600">1년 최고가 대비 ${(p.drawdown * 100).toFixed(1)}%</span> · 최고가 ${won(p.hi52)}</div>` : "";
   const money = can ? `<div class="val num"><div style="color:var(--label);font-weight:600">${won(p.buy * p.qty)}원</div><div class="sub">${won(p.qty)}주</div></div>` : "";
   const metrics = can ? `<div class="cell" style="padding:0"><div class="metrics num" style="width:100%">
-        <div class="metric"><div class="k">매수가</div><div class="v">${won(p.buy)}</div></div>
+        <div class="metric"><div class="k">매수 참고가</div><div class="v">${won(p.buy)}</div></div>
         <div class="metric"><div class="k">익절</div><div class="v up">${won(p.target)}</div></div>
         <div class="metric"><div class="k">손절</div><div class="v down">${won(p.stop)}</div></div>
         <div class="metric"><div class="k">전일 종가</div><div class="v">${won(p.close)}</div></div>
@@ -349,7 +409,7 @@ function pickCard(p, isToday){
       <label class="cell tap pick-head"><input type="checkbox" class="pick" value="${esc(p.ticker)}" ${isToday && can ? "checked" : "disabled"}>
         <span class="checkcircle">${I.check}</span>
         <div class="grow"><div class="title17 trunc">${esc(p.name)}</div><div class="sub trunc">${esc(p.ticker)}${tags ? " · " + tags : ""}</div>${dd}${down}</div>
-        ${money}</label>${metrics}${quarters}</div>`;
+        ${money}</label><div class="quote" data-t="${esc(p.ticker)}"></div>${metrics}${quarters}</div>`;
 }
 
 // ---------------------------------------------------------------- 화면: 주문
@@ -368,7 +428,7 @@ async function viewOrders(v){
       <div class="grow"><div class="title17 trunc">${esc(o.name)} <span class="pill" style="vertical-align:2px">방식${o.method || 1}</span></div>
         <div class="sub num trunc">${won(o.ordered_qty ?? o.qty)}주 × ${won(o.buy)}원 · 승인 ${esc((o.approved || "").slice(0, 5))}${o.ordered ? " · 주문 " + esc(o.ordered.slice(0, 5)) : ""}</div></div>
       ${statusPill(o.status)}</div>`).join("") + `</div>
-    <div class="sec-foot">체결 여부는 15:45 계좌 동기화 때 반영됩니다. 지금 확인하려면 계좌 탭에서 '지금 동기화'를 누르세요.</div>`;
+    <div class="sec-foot">주문가는 승인 시점의 현재가입니다. 체결 여부는 15:45 계좌 동기화 때 반영됩니다. 지금 확인하려면 계좌 탭에서 '지금 동기화'를 누르세요.</div>`;
   }
   h += `<div class="group" style="margin-top:24px"><div class="cell action" onclick="render()">새로고침</div></div>`;
   v.innerHTML = h;
@@ -405,7 +465,7 @@ async function viewAccount(v){
 }
 
 // ---------------------------------------------------------------- 화면: 실행
-const WF = {"daily.yml": "아침 추천", "order.yml": "주문 승인", "sync.yml": "계좌 동기화", "backtest.yml": "백테스트", "trade.yml": "매수·매도 기록",
+const WF = {"daily.yml": "아침 추천", "order.yml": "주문 승인", "sync.yml": "계좌 동기화", "quote.yml": "현재가 조회", "backtest.yml": "백테스트", "trade.yml": "매수·매도 기록",
             "krx-check.yml": "접속 시험", "notify.yml": "알림 설정", "diagnose.yml": "추천 진단", "experiment.yml": "수익률 실험"};
 async function viewRuns(v){
   v.innerHTML = loading();
